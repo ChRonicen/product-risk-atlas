@@ -8,7 +8,7 @@ Enter a product name and choose how many results to review. Product Risk Atlas s
 
 ## Demo
 
-https://github.com/user-attachments/assets/c9661130-9371-4b9d-a3cb-ed1deaf569b1
+https://github.com/user-attachments/assets/cee9b914-2e7c-4132-9809-84e9604dc8b0
 
 ## Architecture
 
