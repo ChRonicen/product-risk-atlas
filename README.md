@@ -8,9 +8,7 @@ Enter a product name and choose how many results to review. Product Risk Atlas s
 
 ## Demo
 
-**Video Walkthrough:** [Watch the 43-second demo](https://github.com/ChRonicen/product-risk-atlas/blob/agent/demo-rate-limit/assets/product-risk-atlas-demo.mp4)
-
-[![Watch the Product Risk Atlas demo](assets/product-risk-atlas-demo-cover.png)](assets/product-risk-atlas-demo.mp4)
+https://github.com/user-attachments/assets/c9661130-9371-4b9d-a3cb-ed1deaf569b1
 
 ## Architecture
 
