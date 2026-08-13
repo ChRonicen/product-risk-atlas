@@ -132,10 +132,21 @@ async function scanMarket(client, market, product, reviewLimit, onProgress) {
   }
 
   onProgress?.({ type: "market_fetching", market: market.id, count: candidates.length });
-  const fetched = await client.fetch.getContents({
-    urls: candidates.map((item) => item.url),
-    purpose: `Extract official recall evidence for ${product}`
-  });
+  const candidateUrls = candidates.map((item) => item.url);
+  const fetchBatches = [];
+  for (let index = 0; index < candidateUrls.length; index += 10) {
+    fetchBatches.push(candidateUrls.slice(index, index + 10));
+  }
+  const fetchResponses = await Promise.all(fetchBatches.map((urls) =>
+    client.fetch.getContents({
+      urls,
+      purpose: `Extract official recall evidence for ${product}`
+    })
+  ));
+  const fetched = {
+    results: fetchResponses.flatMap((response) => response.results ?? []),
+    errors: fetchResponses.flatMap((response) => response.errors ?? [])
+  };
 
   const records = (fetched.results ?? []).map((page) => {
     const searchHit = candidates.find((item) => item.url === page.url || item.url === page.final_url);
