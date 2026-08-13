@@ -8,6 +8,7 @@ const marketGrid = document.querySelector("#market-grid");
 const amountInput = document.querySelector("#amount");
 const amountOutput = document.querySelector("#amount-output");
 const amountMarks = [...document.querySelectorAll(".amount-mark")];
+let rateLimitTimer;
 
 const marketDefinitions = [
   { id: "US", name: "United States", authority: "U.S. CPSC" },
@@ -197,9 +198,33 @@ function beginLoading(product) {
 }
 
 function endLoading() {
+  clearInterval(rateLimitTimer);
+  button.classList.remove("rate-limited");
   button.disabled = false;
   button.textContent = "Run scan";
   form.setAttribute("aria-busy", "false");
+}
+
+function beginRateLimitCountdown(seconds) {
+  clearInterval(rateLimitTimer);
+  form.setAttribute("aria-busy", "false");
+  button.disabled = true;
+  button.classList.add("rate-limited");
+  const endsAt = Date.now() + seconds * 1000;
+
+  const updateButton = () => {
+    const remaining = Math.max(0, Math.ceil((endsAt - Date.now()) / 1000));
+    if (!remaining) {
+      endLoading();
+      return;
+    }
+    const minutes = Math.floor(remaining / 60);
+    const secondsPart = String(remaining % 60).padStart(2, "0");
+    button.textContent = `Try again in ${minutes}:${secondsPart}`;
+  };
+
+  updateButton();
+  rateLimitTimer = setInterval(updateButton, 1000);
 }
 
 async function getJob(jobId) {
@@ -254,7 +279,13 @@ async function runNewScan(product, reviewLimit, apiKey) {
     body: JSON.stringify({ product, reviewLimit, apiKey })
   });
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error || "Scan could not be started");
+  if (!response.ok) {
+    const error = new Error(data.error || "Scan could not be started");
+    if (response.status === 429) {
+      error.retryAfter = Number(data.retryAfter || response.headers.get("retry-after") || 300);
+    }
+    throw error;
+  }
   sessionStorage.setItem("risk-atlas-active-scan", data.id);
   history.replaceState(null, "", `/?scan=${encodeURIComponent(data.id)}`);
   await followJob(data.id);
@@ -264,14 +295,17 @@ form.addEventListener("submit", async (event) => {
   event.preventDefault();
   const values = new FormData(form);
   const product = String(values.get("product") || "power bank").trim();
+  let retryAfter = 0;
 
   try {
     await runNewScan(product, values.get("reviewLimit"), values.get("apiKey"));
   } catch (error) {
+    retryAfter = Number(error.retryAfter || 0);
     statusPanel.className = "status-panel error";
     statusPanel.innerHTML = `<p><strong>Scan failed.</strong> ${escapeHtml(error.message)}</p>`;
   } finally {
-    endLoading();
+    if (retryAfter > 0) beginRateLimitCountdown(retryAfter);
+    else endLoading();
   }
 });
 
