@@ -1,9 +1,18 @@
 # PRODUCT RISK ATLAS
-**Live Demo:** https://pra.ironip.link
+
+**Live Demo:** [pra.ironip.link](https://pra.ironip.link)
+
+**Video Walkthrough:** [Watch the 43-second demo](assets/product-risk-atlas-demo.mp4)
 
 **Cross-market product recall intelligence powered by TinyFish Search and Fetch.**
 
 Enter a product name and choose how many results to review. Product Risk Atlas searches official recall authorities across eight major markets, filters individual recall records from irrelevant results, fetches the accepted evidence, and builds regional risk rankings with direct source links.
+
+## Demo
+
+[![Watch the Product Risk Atlas demo](assets/product-risk-atlas-demo-cover.png)](assets/product-risk-atlas-demo.mp4)
+
+Click the preview to watch a complete scan move from live regional progress to accepted and excluded recall evidence.
 
 ## Architecture
 
