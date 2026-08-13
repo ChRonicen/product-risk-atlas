@@ -27,7 +27,7 @@ https://github.com/user-attachments/assets/cee9b914-2e7c-4132-9809-84e9604dc8b0
 │  Server-side session store                                  │
 │    │                                                        │
 │    ├─ TinyFish Search ──► 8 official authority domains      │
-│    │     page 1-3, based on selected amount                 │
+│    │     page 1-2, based on selected amount                 │
 │    │     Google-translated EN / ZH / JA / KO product terms  │
 │    │                                                        │
 │    ├─ Result review ──► accepted + excluded records         │
@@ -45,7 +45,7 @@ No database. Scan sessions and progress events are stored in memory for one hour
 ```text
 client.search.query({ query, page })
   │
-  ├── 5-30 ranked results per market
+  ├── 5-15 ranked results per market
   ├── deterministic URL review
   │     ├── accepted: individual recall record
   │     └── excluded: index, guidance, unrelated page
@@ -58,7 +58,7 @@ client.search.query({ query, page })
 ## Features
 
 - Search **8 markets**: US, EU, UK, Canada, Australia, Mainland China, Japan and South Korea
-- Review **5-30 results per market** in increments of 5
+- Review **5, 10 or 15 results per market**
 - Watch each market move through **Queued → Searching → Fetching → Complete**
 - See completed regional cards immediately without waiting for the slowest market
 - Compare recurring risk signals on a **0-10 scale**
@@ -72,7 +72,7 @@ client.search.query({ query, page })
 1. User enters a product and selects the number of results per market
 2. `POST /api/scans` creates an in-memory scan session
 3. TinyFish Search queries each official authority with a localized product term
-4. Search pagination supplies up to 30 ranked results without expanding the product query
+4. Search pagination supplies up to 15 ranked results without expanding the product query
 5. Deterministic URL rules separate individual recall records from excluded results
 6. TinyFish Fetch reads accepted official pages in parallel
 7. A multilingual dictionary tags fire, overheating, burns, explosion, short circuit, swelling, chemical and injury signals

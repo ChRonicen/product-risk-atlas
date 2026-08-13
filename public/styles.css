@@ -52,7 +52,7 @@ input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in sr
 .amount-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
 .amount-heading output { color: var(--accent); font-family: var(--mono); font-size: 18px; font-weight: 700; }
 .amount-control { position: relative; padding-top: 2px; }
-#amount { --amount-progress: 20%; appearance: none; width: 100%; height: 22px; margin: 0; padding: 0; background: transparent; border: 0; border-radius: 0; box-shadow: none; cursor: pointer; }
+#amount { --amount-progress: 50%; appearance: none; width: 100%; height: 22px; margin: 0; padding: 0; background: transparent; border: 0; border-radius: 0; box-shadow: none; cursor: pointer; }
 #amount::-webkit-slider-runnable-track { height: 3px; background: linear-gradient(to right, var(--accent) 0 var(--amount-progress), var(--line) var(--amount-progress) 100%); border-radius: 3px; }
 #amount::-moz-range-track { height: 3px; background: var(--line); border-radius: 3px; }
 #amount::-moz-range-progress { height: 3px; background: var(--accent); border-radius: 3px; }

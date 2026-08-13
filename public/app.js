@@ -37,9 +37,9 @@ function statusCopy(status) {
 }
 
 function updateAmount(value) {
-  const amount = Math.min(30, Math.max(5, Math.round(Number(value) / 5) * 5));
+  const amount = Math.min(15, Math.max(5, Math.round(Number(value) / 5) * 5));
   amountInput.value = String(amount);
-  amountInput.style.setProperty("--amount-progress", `${((amount - 5) / 25) * 100}%`);
+  amountInput.style.setProperty("--amount-progress", `${((amount - 5) / 10) * 100}%`);
   amountOutput.value = String(amount);
   amountOutput.textContent = String(amount);
   amountMarks.forEach((mark) => mark.classList.toggle("active", Number(mark.dataset.value) === amount));
@@ -53,7 +53,7 @@ amountInput.addEventListener("keydown", (event) => {
     updateAmount(Number(amountInput.value) + keys[event.key]);
   } else if (event.key === "Home" || event.key === "End") {
     event.preventDefault();
-    updateAmount(event.key === "Home" ? 5 : 30);
+    updateAmount(event.key === "Home" ? 5 : 15);
   }
 });
 amountMarks.forEach((mark) => mark.addEventListener("click", () => updateAmount(mark.dataset.value)));

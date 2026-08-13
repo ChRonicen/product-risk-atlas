@@ -200,7 +200,7 @@ export async function scanProduct({
   onProgress
 } = {}) {
   product = product.trim() || "power bank";
-  reviewLimit = Math.min(30, Math.max(5, Math.round(Number(reviewLimit) / 5) * 5 || 10));
+  reviewLimit = Math.min(15, Math.max(5, Math.round(Number(reviewLimit) / 5) * 5 || 10));
   if (!apiKey) {
     throw new Error("TINYFISH_API_KEY is required");
   }
