@@ -15,6 +15,37 @@ const assets = new Map([
 ]);
 const types = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8" };
 const jobs = new Map();
+const scanRequests = new Map();
+const scanRateWindowMs = 5 * 60 * 1000;
+const scanRateLimit = 20;
+
+function clientAddress(request) {
+  return request.headers["cf-connecting-ip"]
+    || request.headers["x-forwarded-for"]?.split(",", 1)[0].trim()
+    || request.socket.remoteAddress
+    || "unknown";
+}
+
+function checkScanRateLimit(address) {
+  const now = Date.now();
+
+  for (const [storedAddress, timestamps] of scanRequests) {
+    const active = timestamps.filter((time) => now - time < scanRateWindowMs);
+    if (active.length) scanRequests.set(storedAddress, active);
+    else scanRequests.delete(storedAddress);
+  }
+
+  const recent = (scanRequests.get(address) || []).filter((time) => now - time < scanRateWindowMs);
+  if (recent.length >= scanRateLimit) {
+    return {
+      allowed: false,
+      retryAfter: Math.max(1, Math.ceil((recent[0] + scanRateWindowMs - now) / 1000))
+    };
+  }
+  recent.push(now);
+  scanRequests.set(address, recent);
+  return { allowed: true, retryAfter: 0 };
+}
 
 function startScanJob({ product, reviewLimit, apiKey }) {
   const id = randomUUID();
@@ -47,6 +78,18 @@ const server = createServer(async (request, response) => {
   try {
     const pathname = new URL(request.url, "http://localhost").pathname;
     if (request.method === "POST" && pathname === "/api/scans") {
+      const rateLimit = checkScanRateLimit(clientAddress(request));
+      if (!rateLimit.allowed) {
+        response.writeHead(429, {
+          "content-type": "application/json",
+          "cache-control": "no-store",
+          "retry-after": String(rateLimit.retryAfter)
+        });
+        return response.end(JSON.stringify({
+          error: "Demo limit reached. Try again when the timer ends.",
+          retryAfter: rateLimit.retryAfter
+        }));
+      }
       const { product, reviewLimit, apiKey } = await readJson(request);
       if (typeof product !== "string" || product.trim().length < 2) {
         response.writeHead(400, { "content-type": "application/json" });

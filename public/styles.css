@@ -70,6 +70,7 @@ button { width: 100%; padding: 14px 20px; color: var(--accent-ink); background: 
 button:hover { opacity: .9; }
 button:active { transform: translateY(1px); }
 button:disabled { cursor: wait; opacity: .7; }
+button.rate-limited { cursor: not-allowed; }
 .status-panel { margin-bottom: 36px; padding: 18px 0; color: var(--muted); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .status-panel p { margin: 0; }
 .status-panel.error { color: var(--accent); }
