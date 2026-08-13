@@ -17,7 +17,7 @@ Use three consumer-product categories to determine, from real TinyFish runs, whi
 - United Kingdom
 - Canada
 - Australia
-- Mainland China
+- France
 - Japan
 - South Korea
 

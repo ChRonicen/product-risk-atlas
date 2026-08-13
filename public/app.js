@@ -16,7 +16,7 @@ const marketDefinitions = [
   { id: "UK", name: "United Kingdom", authority: "UK OPSS" },
   { id: "CA", name: "Canada", authority: "Health Canada" },
   { id: "AU", name: "Australia", authority: "Product Safety Australia" },
-  { id: "CN", name: "Mainland China", authority: "SAMR" },
+  { id: "FR", name: "France", authority: "RappelConso" },
   { id: "JP", name: "Japan", authority: "Consumer Affairs Agency" },
   { id: "KR", name: "South Korea", authority: "Safety Korea" }
 ];
@@ -32,6 +32,7 @@ function riskScore(value) {
 function statusCopy(status) {
   if (status === "ok") return "Page evidence";
   if (status === "partial") return "Search evidence only";
+  if (status === "analysis_failed") return "Evidence only";
   if (status === "no_candidates") return "No records found";
   return "Source unavailable";
 }
@@ -115,7 +116,7 @@ function renderMatrix(markets) {
 }
 
 function loadingCard(market) {
-  return `<article class="market-card market-loading" id="market-${market.id}" aria-busy="true">
+  return `<article class="market-card market-loading" id="market-${market.id}" data-stage="queued" aria-busy="true">
     <header>
       <div><span class="market-id">${market.id}</span><h3>${escapeHtml(market.name)}</h3></div>
       <span class="quality quality-active">Queued</span>
@@ -155,6 +156,28 @@ function completedCard(market) {
   </article>`;
 }
 
+function evidenceCard(market) {
+  sessionStorage.setItem(`risk-atlas-market-${market.id}`, JSON.stringify(market));
+  const scanId = sessionStorage.getItem("risk-atlas-active-scan");
+  const records = market.records.slice(0, 3).map((record) => `
+    <li><a href="${escapeHtml(record.url)}" target="_blank" rel="noreferrer">${escapeHtml(record.title)}</a><span>${escapeHtml(record.evidence === "fetched_page" ? "Fetched page" : "Search snippet")}</span></li>`).join("");
+  return `<article class="market-card market-loading" id="market-${market.id}" data-stage="analyzing" aria-busy="true">
+    <header>
+      <div><span class="market-id">${escapeHtml(market.id)}</span><h3>${escapeHtml(market.name)}</h3></div>
+      <span class="quality quality-active">Analyzing risks</span>
+    </header>
+    <p class="authority">${escapeHtml(market.authority)} · ${market.records.length} accepted from ${market.reviewedCount || market.records.length}</p>
+    <p class="activity-copy">Evidence ready · extracting risk labels</p>
+    <ol class="risk-list skeleton-list" aria-label="Risk analysis loading">
+      <li><span class="row-skeleton wide"></span><span class="row-skeleton count"></span></li>
+      <li><span class="row-skeleton medium"></span><span class="row-skeleton count"></span></li>
+      <li><span class="row-skeleton short"></span><span class="row-skeleton count"></span></li>
+    </ol>
+    <ul class="evidence-list">${records || "<li><span>No usable evidence returned.</span></li>"}</ul>
+    ${market.reviewedCount ? `<a class="view-all" href="/market.html?market=${encodeURIComponent(market.id)}${scanId ? `&scan=${encodeURIComponent(scanId)}` : ""}">View all ${market.reviewedCount} reviewed records</a>` : ""}
+  </article>`;
+}
+
 function renderLoadingMarkets() {
   marketGrid.innerHTML = marketDefinitions.map(loadingCard).join("");
 }
@@ -165,15 +188,34 @@ function updateMarketStage(event) {
   const quality = card.querySelector(".quality");
   const activity = card.querySelector(".activity-copy");
   if (event.type === "market_searching") {
+    card.dataset.stage = "searching";
     quality.textContent = "Searching";
     activity.textContent = `Reviewing up to ${event.amount || amountInput.value} search results`;
   } else if (event.type === "market_candidates") {
+    card.dataset.stage = "candidates";
     quality.textContent = "Candidates found";
     activity.textContent = `Found ${event.count} candidate ${event.count === 1 ? "page" : "pages"}`;
   } else if (event.type === "market_fetching") {
+    card.dataset.stage = "fetching";
     quality.textContent = "Fetching";
     activity.textContent = `Reading ${event.count} official ${event.count === 1 ? "page" : "pages"}`;
+  } else if (event.type === "market_analyzing") {
+    card.dataset.stage = "analyzing";
+    quality.textContent = "Analyzing risks";
+    activity.textContent = `Analyzing ${event.count} accepted ${event.count === 1 ? "record" : "records"}`;
+  } else if (event.type === "market_analysis_ready") {
+    card.dataset.stage = "waiting";
+    quality.textContent = "Waiting";
+    activity.textContent = "Waiting for other markets to finish";
   }
+}
+
+function showNormalizationStage() {
+  document.querySelectorAll('.market-card[data-stage="waiting"]').forEach((card) => {
+    card.dataset.stage = "normalizing";
+    card.querySelector(".quality").textContent = "Normalizing";
+    card.querySelector(".activity-copy").textContent = "Aligning similar risk labels across markets";
+  });
 }
 
 function updateOverallProgress(completed) {
@@ -245,8 +287,13 @@ async function followJob(jobId, initialSnapshot) {
     initialSnapshot = null;
     for (const scanEvent of snapshot.events.filter((item) => item.sequence > lastSequence)) {
       lastSequence = scanEvent.sequence;
-      if (["market_searching", "market_candidates", "market_fetching"].includes(scanEvent.type)) {
+      if (["market_searching", "market_candidates", "market_fetching", "market_analyzing", "market_analysis_ready"].includes(scanEvent.type)) {
         updateMarketStage(scanEvent);
+      } else if (scanEvent.type === "scan_normalizing") {
+        showNormalizationStage();
+      } else if (scanEvent.type === "market_evidence_ready") {
+        const card = document.querySelector(`#market-${scanEvent.market}`);
+        if (card) card.outerHTML = evidenceCard(scanEvent.result);
       } else if (scanEvent.type === "market_complete") {
         const card = document.querySelector(`#market-${scanEvent.market}`);
         if (card) card.outerHTML = completedCard(scanEvent.result);

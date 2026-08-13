@@ -2,89 +2,85 @@
 
 **Live Demo:** [pra.ironip.link](https://pra.ironip.link)
 
-**Cross-market product recall intelligence powered by TinyFish Search and Fetch.**
+**Cross-market product recall intelligence powered by TinyFish.**
 
-Enter a product name and choose how many results to review. Product Risk Atlas searches official recall authorities across eight major markets, filters individual recall records from irrelevant results, fetches the accepted evidence, and builds regional risk rankings with direct source links.
+Product Risk Atlas turns a product name into a source-linked view of recurring safety risks across eight major markets. It searches official recall authorities, separates usable recall records from irrelevant results, reads the accepted evidence, and uses an LLM to extract and align risk labels without letting the model calculate the final scores.
 
 ## Demo
 
 https://github.com/user-attachments/assets/cee9b914-2e7c-4132-9809-84e9604dc8b0
 
+## What It Does
+
+1. Translates the product term for French, Japanese and Korean sources
+2. Searches eight fixed official authority domains with TinyFish Search
+3. Reviews 5, 10 or 15 ranked results per market
+4. Separates individual recall records from indexes, guidance and unrelated pages
+5. Reads accepted detail pages with TinyFish Fetch
+6. Extracts evidence-backed risk labels with one parallel LLM request per market
+7. Aligns synonymous labels once across all completed markets
+8. Counts occurrences in application code and displays regional rankings on a 0-10 scale
+
+The interface exposes the pipeline while it runs. Evidence links appear as soon as a market has been fetched; risk rankings follow after extraction and cross-market label alignment. Every reviewed result remains inspectable as either accepted or excluded evidence.
+
 ## Architecture
 
 ```text
-┌─────────────────────────────────────────────────────────────┐
-│                      Browser (Client)                       │
-│                                                             │
-│  Product input → Amount slider → Regional cards             │
-│  Live market status → Risk matrix → Evidence detail page    │
-└──────────────────────────┬──────────────────────────────────┘
-                           │ POST /api/scans
-                           │ GET  /api/scans/:id
-┌──────────────────────────▼──────────────────────────────────┐
-│                 Node.js Scan Orchestrator                   │
-│                                                             │
-│  Server-side session store                                  │
-│    │                                                        │
-│    ├─ TinyFish Search ──► 8 official authority domains      │
-│    │     page 1-2, based on selected amount                 │
-│    │     Google-translated EN / ZH / JA / KO product terms  │
-│    │                                                        │
-│    ├─ Result review ──► accepted + excluded records         │
-│    │                                                        │
-│    └─ TinyFish Fetch ──► accepted official detail pages     │
-│                                                             │
-│  Multilingual risk tags → regional scores → session events  │
-└─────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                       Browser client                         │
+│  Product + amount → live market cards → matrix → evidence   │
+└────────────────────────────┬─────────────────────────────────┘
+                             │ scan ID + event polling
+┌────────────────────────────▼─────────────────────────────────┐
+│                    Node.js orchestrator                      │
+│                                                              │
+│  Google Translation ──► EN / JA / KO product terms           │
+│  TinyFish Search     ──► 8 official authority domains        │
+│  URL review          ──► accepted + excluded records         │
+│  TinyFish Fetch      ──► official recall evidence            │
+│  Market LLM calls    ──► evidence-backed risk labels         │
+│  Global label merge  ──► aligned labels across markets       │
+│  Application code   ──► deterministic counts and scores      │
+└──────────────────────────────────────────────────────────────┘
 ```
 
-No database. Scan sessions and progress events are stored in memory for one hour.
+The server keeps scan sessions and progress events in memory for one hour. There is no external database, and refreshing or returning from a market detail page restores the active scan by ID.
 
-### TinyFish SDK flow
+## Official Markets
 
-```text
-client.search.query({ query, page })
-  │
-  ├── 5-15 ranked results per market
-  ├── deterministic URL review
-  │     ├── accepted: individual recall record
-  │     └── excluded: index, guidance, unrelated page
-  │
-  └── client.fetch.getContents({ urls })
-        ├── fetched page evidence
-        └── search snippet fallback
-```
+| Market | Source |
+|---|---|
+| United States | U.S. CPSC |
+| European Union | EU Safety Gate |
+| United Kingdom | UK OPSS |
+| Canada | Health Canada |
+| Australia | Product Safety Australia |
+| France | RappelConso |
+| Japan | Consumer Affairs Agency |
+| South Korea | Safety Korea |
+
+These sources are deliberately fixed. The demo is designed to compare official recall evidence, not roam the open web.
 
 ## Features
 
-- Search **8 markets**: US, EU, UK, Canada, Australia, Mainland China, Japan and South Korea
-- Review **5, 10 or 15 results per market**
-- Watch each market move through **Queued → Searching → Fetching → Complete**
-- See completed regional cards immediately without waiting for the slowest market
-- Compare recurring risk signals on a **0-10 scale**
-- Preview the top three accepted records on each market card
-- Open all reviewed results, split into **Accepted Evidence** and **Excluded Search Results**
-- Restore active scans after refresh, detail navigation, or browser back using a scan session ID
-- Use the server demo key or optionally **Bring Your Own TinyFish Key**
-
-## Search and Review Flow
-
-1. User enters a product and selects the number of results per market
-2. `POST /api/scans` creates an in-memory scan session
-3. TinyFish Search queries each official authority with a localized product term
-4. Search pagination supplies up to 15 ranked results without expanding the product query
-5. Deterministic URL rules separate individual recall records from excluded results
-6. TinyFish Fetch reads accepted official pages in parallel
-7. A multilingual dictionary tags fire, overheating, burns, explosion, short circuit, swelling, chemical and injury signals
-8. The UI polls the scan session and restores every completed market from saved events
+- Live per-market stages: queued, searching, fetching, analyzing, waiting and normalizing
+- Early evidence display while risk analysis is still running
+- Regional risk rankings and a cross-market comparison matrix
+- Accepted and excluded results shown on separate evidence lists
+- Direct links back to every official source
+- Navigation-safe scan sessions and browser-back restoration
+- Server-side demo credentials with optional Bring Your Own TinyFish Key
+- 20 scan requests per Cloudflare client IP every five minutes
 
 ## Risk Score
 
 ```text
-risk score = records mentioning the risk / accepted records x 10
+risk score = records mentioning the risk / accepted records × 10
 ```
 
-A score of `8.0` means 80% of the accepted recall records for that market mention the risk. The score measures signal frequency in the collected recalls, not real-world incident probability.
+A score of `8.0` means that 80% of the accepted records in that market mention the risk. It measures signal frequency in the collected recall evidence—not incident probability, severity, or the overall safety of the product category.
+
+The LLM extracts and normalizes labels only. Deduplication, occurrence counts, percentages and scores are calculated in JavaScript to avoid model-generated arithmetic.
 
 ## Setup
 
@@ -93,89 +89,94 @@ A score of `8.0` means 80% of the accepted recall records for that market mentio
 - Node.js 20+
 - TinyFish API key
 - Google Cloud Translation API key
+- OpenAI-compatible API key for risk analysis
 
-### Environment Variables
+### Environment
 
-Use `.env.example` as a reference and inject the demo key into the server process:
+Copy `.env.example` to `.env` and keep it server-side:
 
 ```env
 TINYFISH_API_KEY=your-tinyfish-api-key
-GOOGLE_TRANSLATE_API_KEY=your-google-translation-api-key
+GOOGLE_TRANSLATE_API_KEY=your-google-translation-key
+RISK_LLM_API_KEY=your-openai-compatible-key
+RISK_LLM_BASE_URL=https://api.deepseek.com
+RISK_LLM_MODEL=deepseek-v4-flash
+RISK_LLM_THINKING=disabled
 PORT=4173
 ```
 
-The server never returns the demo key to the browser.
-
-Bring Your Own Key is optional. A user key is used for one scan and is never stored in session events, URLs, browser storage, or API responses. Use HTTPS in production.
+The demo keys are never returned to the browser. A user-supplied TinyFish key is used for that scan only and is not written to session events, URLs, browser storage or API responses. Use HTTPS in production.
 
 ### Install and Run
 
 ```bash
 npm install
-TINYFISH_API_KEY=your_key GOOGLE_TRANSLATE_API_KEY=your_google_key npm start
+set -a; source .env; set +a
+npm start
 ```
 
-Open http://localhost:4173
+Open [http://localhost:4173](http://localhost:4173).
 
 ### CLI Scanner
 
 ```bash
-TINYFISH_API_KEY=your_key GOOGLE_TRANSLATE_API_KEY=your_google_key npm run scan -- "power bank"
+set -a; source .env; set +a
+npm run scan -- "power bank"
 ```
 
 The CLI prints the complete structured scan result as JSON.
 
 ## Deployment
 
-Any Node-compatible VPS works. Install production dependencies, inject `TINYFISH_API_KEY` and `GOOGLE_TRANSLATE_API_KEY` through the process manager, and place Caddy or Nginx with HTTPS in front of the app.
+The included Dockerfile packages the Node.js service for an HTTPS reverse proxy such as Nginx, Caddy or 1Panel OpenResty. Keep the container bound to localhost when the proxy runs on the same host.
 
 ```bash
-npm ci --omit=dev
-TINYFISH_API_KEY=your_key GOOGLE_TRANSLATE_API_KEY=your_google_key PORT=4173 npm start
+docker build -t product-risk-atlas .
+docker run -d --name product-risk-atlas \
+  --env-file .env \
+  -p 127.0.0.1:4173:4173 \
+  product-risk-atlas
 ```
+
+Keep `.env` outside the image and repository. The live demo uses a server-specific Compose file and reverse-proxy configuration that are intentionally not published.
 
 ## Project Structure
 
 ```text
 product-risk-atlas/
 ├── public/
-│   ├── index.html       # Search form, amount selector and results layout
-│   ├── app.js           # Scan session polling and progressive card updates
+│   ├── index.html       # Search form and results layout
+│   ├── app.js           # Session polling and progressive UI
 │   ├── market.html      # Full regional evidence page
 │   ├── market.js        # Accepted and excluded result rendering
-│   └── styles.css       # Responsive light and dark UI
+│   └── styles.css
 ├── scripts/
-│   └── risk-scan.mjs    # TinyFish Search, Fetch and scoring pipeline
-├── research/
-│   ├── experiment-protocol.md
-│   └── product-scopes.json
-├── server.mjs           # HTTP API and in-memory scan sessions
-├── .env.example
-└── package.json
+│   ├── risk-scan.mjs    # Translation, TinyFish and scan pipeline
+│   └── risk-llm.mjs     # Risk extraction and label alignment
+├── research/            # Experiment notes and product scopes
+├── server.mjs           # HTTP API, rate limit and scan sessions
+├── Dockerfile
+└── .env.example
 ```
-
-## Constraint Checklist
-
-| Constraint | Status |
-|---|---|
-| External database used? | NO (pure in-memory) |
-| Fixed official sources? | YES (one authority per market) |
-| Search pagination? | YES (up to 3 pages per market) |
-| Accepted and excluded evidence visible? | YES |
-| Progressive market status? | YES (session event polling) |
-| Navigation-safe scans? | YES (server-side scan ID) |
-| Demo key exposed to browser? | NO |
-| Bring Your Own Key stored? | NO |
 
 ## Tech Stack
 
 - **Server:** Node.js HTTP server
 - **Frontend:** Vanilla JavaScript and CSS
-- **Web Data:** TinyFish SDK (`client.search.query`, `client.fetch.getContents`)
-- **Query Localization:** Google Cloud Translation API
+- **Web data:** TinyFish Search and Fetch SDK
+- **Localization:** Google Cloud Translation API
+- **Risk analysis:** OpenAI-compatible LLM; DeepSeek V4 Flash by default
 - **State:** In-memory scan sessions with one-hour cleanup
-- **Deployment:** Node-compatible VPS behind HTTPS
+- **Deployment:** Docker behind an HTTPS reverse proxy
+
+## Prototype Boundaries
+
+- Search quality depends on how well each authority is indexed
+- Markets can return different evidence volumes; the UI preserves those differences
+- URL rules favor recall detail pages and may exclude useful but non-standard records
+- Risk labels summarize the collected recall evidence and can still require human review
+- Sessions are ephemeral and disappear after one hour or a server restart
 
 ## Disclaimer
 
-Product Risk Atlas is a research prototype. It summarizes public recall evidence and does not replace legal, regulatory, engineering, or product safety review. Always verify findings against the linked official sources.
+Product Risk Atlas is a research prototype. It summarizes public recall evidence and does not replace legal, regulatory, engineering or product-safety review. Always verify findings against the linked official sources.

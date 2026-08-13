@@ -9,7 +9,7 @@ const escapeHtml = (value = "") => String(value).replace(/[&<>'"]/g, (character)
 })[character]);
 
 function renderAcceptedRecord(record, index) {
-  const tags = record.tags.map((tag) => `<li>${escapeHtml(tag.label)}</li>`).join("");
+  const tags = (record.factors || []).map((factor) => `<li>${escapeHtml(factor.label)}</li>`).join("");
   return `<article class="record-card">
     <header>
       <h3>${index + 1}. ${escapeHtml(record.title)}</h3>

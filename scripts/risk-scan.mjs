@@ -1,4 +1,5 @@
 import { TinyFish } from "@tiny-fish/sdk";
+import { aggregateRisks, analyzeMarketRisks, normalizeRiskLabels } from "./risk-llm.mjs";
 
 function marketsFor(terms) {
   return [
@@ -7,7 +8,7 @@ function marketsFor(terms) {
   { id: "UK", name: "United Kingdom", authority: "UK OPSS", domain: "gov.uk", term: terms.en, recallTerm: "recall", detail: /(product-safety-alerts-reports-recalls|\.pdf)/i },
   { id: "CA", name: "Canada", authority: "Health Canada", domain: "recalls-rappels.canada.ca", term: terms.en, recallTerm: "recall", detail: /\/alert-recall\//i },
   { id: "AU", name: "Australia", authority: "Product Safety Australia", domain: "productsafety.gov.au", term: terms.en, recallTerm: "recall", detail: /(\/recalls?\/|recall.*\.pdf|system\/files\/recall)/i },
-  { id: "CN", name: "Mainland China", authority: "SAMR", domain: "samr.gov.cn", term: terms.zh, recallTerm: "召回" },
+  { id: "FR", name: "France", authority: "RappelConso", domain: "rappel.conso.gouv.fr", term: terms.fr, recallTerm: "rappel", detail: /(\/fiche-rappel\/|\/affichettePDF\/)/i },
   { id: "JP", name: "Japan", authority: "Consumer Affairs Agency", domain: "recall.caa.go.jp", term: terms.ja, recallTerm: "recall", detail: /detail\.php/i },
   { id: "KR", name: "South Korea", authority: "Safety Korea", domain: "safetykorea.kr", term: terms.ko, recallTerm: "리콜", detail: /recallUid=/i }
   ];
@@ -15,7 +16,7 @@ function marketsFor(terms) {
 
 const translationTargets = {
   en: "en",
-  zh: "zh-CN",
+  fr: "fr",
   ja: "ja",
   ko: "ko"
 };
@@ -54,24 +55,6 @@ async function translateProduct(product, apiKey) {
   return Object.fromEntries(entries);
 }
 
-const riskTerms = [
-  { id: "fire", label: "Fire / ignition", terms: ["fire", "ignite", "catch fire", "発火", "火災", "着火", "화재", "발화"] },
-  { id: "overheating", label: "Overheating", terms: ["overheat", "overheating", "overheated", "過熱", "発熱", "过热", "发热", "과열", "발열"] },
-  { id: "burn", label: "Burn injury", terms: ["burn hazard", "burn injury", "burns", "火傷", "やけど", "烧伤", "烫伤", "화상"] },
-  { id: "explosion", label: "Explosion", terms: ["explode", "explosion", "破裂", "爆発", "爆炸", "폭발"] },
-  { id: "short_circuit", label: "Short circuit", terms: ["short circuit", "short-circuit", "内部短絡", "短路", "内部短路", "단락", "쇼트"] },
-  { id: "swelling", label: "Battery swelling", terms: ["swell", "swelling", "膨張", "膨胀", "부풀", "팽창"] },
-  { id: "chemical", label: "Chemical exposure", terms: ["chemical hazard", "toxic", "cadmium", "化学危害", "有害物质", "유해물질"] },
-  { id: "injury", label: "Other injury", terms: ["injury", "injuries", "負傷", "けが", "受伤", "부상"] }
-];
-
-function tagsFor(text) {
-  const haystack = text.toLowerCase();
-  return riskTerms
-    .filter((risk) => risk.terms.some((term) => haystack.includes(term.toLowerCase())))
-    .map(({ id, label }) => ({ id, label }));
-}
-
 function cleanTitle(title = "") {
   return title.replace(/\s+/g, " ").trim();
 }
@@ -92,7 +75,7 @@ function reviewSearchResult(item, market) {
   return null;
 }
 
-async function scanMarket(client, market, product, reviewLimit, onProgress) {
+async function scanMarket(client, market, product, reviewLimit, onProgress, llmConfig) {
   const query = `site:${market.domain} ${market.term} ${market.recallTerm}`;
   const pageCount = Math.ceil(reviewLimit / 10);
   onProgress?.({ type: "market_searching", market: market.id, query, amount: reviewLimit, pageCount });
@@ -100,7 +83,7 @@ async function scanMarket(client, market, product, reviewLimit, onProgress) {
     client.search.query({
       query,
       page: index + 1,
-      language: market.id === "CN" ? "zh" : market.id === "JP" ? "ja" : market.id === "KR" ? "ko" : "en",
+      language: market.id === "FR" ? "fr" : market.id === "JP" ? "ja" : market.id === "KR" ? "ko" : "en",
       purpose: `Find official ${market.authority} product recall records for ${product}`
     })
   ));
@@ -148,7 +131,7 @@ async function scanMarket(client, market, product, reviewLimit, onProgress) {
     errors: fetchResponses.flatMap((response) => response.errors ?? [])
   };
 
-  const records = (fetched.results ?? []).map((page) => {
+  const evidenceRecords = (fetched.results ?? []).map((page) => {
     const searchHit = candidates.find((item) => item.url === page.url || item.url === page.final_url);
     const evidenceText = (page.text ?? "").slice(0, 2500);
     const combined = `${searchHit?.title ?? page.title ?? ""}\n${evidenceText}\n${searchHit?.snippet ?? ""}`;
@@ -158,32 +141,74 @@ async function scanMarket(client, market, product, reviewLimit, onProgress) {
       url: page.final_url || page.url,
       searchUrl: searchHit?.url || page.url,
       excerpt: summarizeText(searchOnly ? searchHit?.snippet : page.text),
-      tags: tagsFor(combined),
+      analysisText: combined,
       textLength: page.text?.length ?? 0,
       evidence: searchOnly ? "search_snippet" : "fetched_page"
     };
   });
 
-  const fetchedUrls = new Set(records.map((record) => record.searchUrl));
+  const fetchedUrls = new Set(evidenceRecords.map((record) => record.searchUrl));
   const excludedRecords = reviewedResults
     .filter((item) => item.exclusionReason || ![...fetchedUrls].some((url) => url === item.url))
     .map((item) => ({
       ...item,
       exclusionReason: item.exclusionReason || "Official page could not be fetched"
     }));
-
-  const riskCounts = new Map();
-  for (const record of records) {
-    for (const tag of record.tags) {
-      const current = riskCounts.get(tag.id) ?? { ...tag, count: 0 };
-      current.count += 1;
-      riskCounts.set(tag.id, current);
-    }
+  const publicEvidenceRecords = evidenceRecords.map(({ analysisText, ...record }) => record);
+  if (!evidenceRecords.length) {
+    const fetchFailed = {
+      id: market.id,
+      name: market.name,
+      authority: market.authority,
+      query,
+      status: "fetch_failed",
+      records: [],
+      excludedRecords,
+      reviewedCount: reviewedResults.length,
+      risks: [],
+      fetchErrors: fetched.errors ?? []
+    };
+    onProgress?.({ type: "market_complete", market: market.id, result: fetchFailed });
+    return fetchFailed;
   }
+  onProgress?.({
+    type: "market_evidence_ready",
+    market: market.id,
+    result: {
+      ...market,
+      query,
+      status: "evidence_ready",
+      records: publicEvidenceRecords,
+      excludedRecords,
+      reviewedCount: reviewedResults.length,
+      risks: [],
+      fetchErrors: fetched.errors ?? []
+    }
+  });
+  onProgress?.({ type: "market_analyzing", market: market.id, count: evidenceRecords.length });
+  let analysis;
+  try {
+    analysis = await analyzeMarketRisks({ product, market, records: evidenceRecords, config: llmConfig });
+  } catch (error) {
+    const analysisFailed = {
+      id: market.id,
+      name: market.name,
+      authority: market.authority,
+      query,
+      status: "analysis_failed",
+      records: publicEvidenceRecords,
+      excludedRecords,
+      reviewedCount: reviewedResults.length,
+      risks: [],
+      analysisError: error instanceof Error ? error.message : "Risk analysis failed",
+      fetchErrors: fetched.errors ?? []
+    };
+    onProgress?.({ type: "market_complete", market: market.id, result: analysisFailed });
+    return analysisFailed;
+  }
+  const records = analysis.records.map(({ analysisText, ...record }) => record);
 
-  const risks = [...riskCounts.values()]
-    .sort((a, b) => b.count - a.count)
-    .map((risk) => ({ ...risk, share: records.length ? risk.count / records.length : 0 }));
+  const risks = aggregateRisks(records);
 
   const result = {
     id: market.id,
@@ -197,9 +222,10 @@ async function scanMarket(client, market, product, reviewLimit, onProgress) {
     excludedRecords,
     reviewedCount: reviewedResults.length,
     risks,
+    llmUsage: analysis.usage,
     fetchErrors: fetched.errors ?? []
   };
-  onProgress?.({ type: "market_complete", market: market.id, result });
+  onProgress?.({ type: "market_analysis_ready", market: market.id, count: records.length });
   return result;
 }
 
@@ -207,6 +233,10 @@ export async function scanProduct({
   product = "power bank",
   apiKey = process.env.TINYFISH_API_KEY,
   translationApiKey = process.env.GOOGLE_TRANSLATE_API_KEY,
+  riskLlmApiKey = process.env.RISK_LLM_API_KEY,
+  riskLlmBaseUrl = process.env.RISK_LLM_BASE_URL || "https://api.deepseek.com",
+  riskLlmModel = process.env.RISK_LLM_MODEL || "deepseek-v4-flash",
+  riskLlmThinking = process.env.RISK_LLM_THINKING || "disabled",
   reviewLimit = 10,
   onProgress
 } = {}) {
@@ -217,6 +247,12 @@ export async function scanProduct({
   }
 
   const client = new TinyFish({ apiKey });
+  const llmConfig = {
+    apiKey: riskLlmApiKey,
+    baseUrl: riskLlmBaseUrl,
+    model: riskLlmModel,
+    thinking: riskLlmThinking
+  };
   const localizedTerms = await translateProduct(product, translationApiKey);
   const markets = marketsFor(localizedTerms);
   const results = [];
@@ -231,7 +267,7 @@ export async function scanProduct({
   for (let index = 0; index < markets.length; index += 4) {
     const batch = markets.slice(index, index + 4);
     results.push(...await Promise.all(batch.map((market) =>
-      scanMarket(client, market, product, reviewLimit, onProgress).catch((error) => {
+      scanMarket(client, market, product, reviewLimit, onProgress, llmConfig).catch((error) => {
         const failed = {
           id: market.id,
           name: market.name,
@@ -247,10 +283,39 @@ export async function scanProduct({
     )));
   }
 
+  onProgress?.({
+    type: "scan_normalizing",
+    marketCount: results.filter((market) => market.records.length && market.status !== "analysis_failed").length
+  });
+
+  let normalization;
+  try {
+    normalization = await normalizeRiskLabels({ markets: results, config: llmConfig });
+  } catch (error) {
+    normalization = {
+      mappings: [],
+      usage: null,
+      error: error instanceof Error ? error.message : "Risk label normalization failed"
+    };
+  }
+  const canonicalByLabel = new Map(normalization.mappings.map((mapping) => [mapping.source.toLowerCase(), mapping.canonical]));
+  for (const market of results) {
+    for (const record of market.records) {
+      for (const factor of record.factors ?? []) {
+        factor.label = canonicalByLabel.get(factor.label.toLowerCase()) || factor.label;
+      }
+    }
+    market.risks = aggregateRisks(market.records);
+    if (market.records.length && market.status !== "analysis_failed") {
+      onProgress?.({ type: "market_complete", market: market.id, result: market });
+    }
+  }
+
   const output = {
     product,
     generatedAt: new Date().toISOString(),
     markets: results,
+    llmUsage: { normalization: normalization.usage, normalizationError: normalization.error ?? null },
     summary: {
       marketsScanned: results.length,
       marketsWithRecords: results.filter((item) => item.records.length).length,
