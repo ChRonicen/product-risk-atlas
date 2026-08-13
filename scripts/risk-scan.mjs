@@ -230,7 +230,7 @@ async function scanMarket(client, market, product, reviewLimit, onProgress, llmC
 }
 
 export async function scanProduct({
-  product = "power bank",
+  product = "Battery",
   apiKey = process.env.TINYFISH_API_KEY,
   translationApiKey = process.env.GOOGLE_TRANSLATE_API_KEY,
   riskLlmApiKey = process.env.RISK_LLM_API_KEY,
@@ -240,7 +240,7 @@ export async function scanProduct({
   reviewLimit = 10,
   onProgress
 } = {}) {
-  product = product.trim() || "power bank";
+  product = product.trim() || "Battery";
   reviewLimit = Math.min(15, Math.max(5, Math.round(Number(reviewLimit) / 5) * 5 || 10));
   if (!apiKey) {
     throw new Error("TINYFISH_API_KEY is required");
@@ -328,7 +328,7 @@ export async function scanProduct({
 }
 
 if (process.argv[1]?.endsWith("risk-scan.mjs")) {
-  const product = process.argv.slice(2).join(" ").trim() || "power bank";
+  const product = process.argv.slice(2).join(" ").trim() || "Battery";
   scanProduct({ product })
     .then((output) => process.stdout.write(`${JSON.stringify(output, null, 2)}\n`))
     .catch((error) => {

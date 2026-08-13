@@ -121,7 +121,7 @@ Open [http://localhost:4173](http://localhost:4173).
 
 ```bash
 set -a; source .env; set +a
-npm run scan -- "power bank"
+npm run scan -- "Battery"
 ```
 
 The CLI prints the complete structured scan result as JSON.

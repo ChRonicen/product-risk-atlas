@@ -341,7 +341,7 @@ async function runNewScan(product, reviewLimit, apiKey) {
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   const values = new FormData(form);
-  const product = String(values.get("product") || "power bank").trim();
+  const product = String(values.get("product") || "Battery").trim();
   let retryAfter = 0;
 
   try {
