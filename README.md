@@ -2,26 +2,26 @@
 
 **Live Demo:** [pra.ironip.link](https://pra.ironip.link)
 
-**Cross-market product recall intelligence powered by TinyFish.**
+**Global product recall risk scanner — compare recurring safety risks across eight official markets in one scan, with every score linked back to its recall evidence.**
 
-Product Risk Atlas turns a product name into a source-linked view of recurring safety risks across eight major markets. It searches official recall authorities, separates usable recall records from irrelevant results, reads the accepted evidence, and uses an LLM to extract and align risk labels without letting the model calculate the final scores.
+Enter a product name and choose how many results to review per market. Product Risk Atlas scans official recall sources in the US, EU, UK, Canada, Australia, France, Japan and South Korea, reveals accepted evidence as each market finishes, and builds regional risk rankings that remain traceable to the original records.
 
 ## Demo
 
 https://github.com/user-attachments/assets/9e84cb58-158b-467d-a4a6-b3d755088bef
 
-## What It Does
+## How to Use It
 
-1. Translates the product term for French, Japanese and Korean sources
-2. Searches eight fixed official authority domains with TinyFish Search
-3. Reviews 5, 10 or 15 ranked results per market
-4. Separates individual recall records from indexes, guidance and unrelated pages
-5. Reads accepted detail pages with TinyFish Fetch
-6. Extracts evidence-backed risk labels with one parallel LLM request per market
-7. Aligns synonymous labels once across all completed markets
-8. Counts occurrences in application code and displays regional rankings on a 0-10 scale
+1. Enter a product category, such as `Battery`, `children's scooter` or `air conditioner`
+2. Choose 5, 10 or 15 search results to review for each market
+3. Run the scan and watch each regional card move from search to evidence and risk analysis
+4. Compare the 0-10 risk rankings, then open any market to inspect accepted and excluded source records
 
-The interface exposes the pipeline while it runs. Evidence links appear as soon as a market has been fetched; risk rankings follow after extraction and cross-market label alignment. Every reviewed result remains inspectable as either accepted or excluded evidence.
+## How It Works
+
+Google Cloud Translation localizes the product query for French, Japanese and Korean sources. TinyFish Search finds candidate records on eight fixed authority domains, and TinyFish Fetch reads the accepted recall pages. An OpenAI-compatible LLM extracts evidence-backed risk labels once per market and aligns synonymous labels across regions. Node.js then deduplicates those labels, calculates every score deterministically and streams progress to the browser through a scan session.
+
+Evidence links appear before the full analysis is complete, so the interface stays useful while slower markets finish. Every reviewed result remains inspectable as either accepted evidence or an excluded search result.
 
 ## Architecture
 
@@ -34,7 +34,7 @@ The interface exposes the pipeline while it runs. Evidence links appear as soon 
 ┌────────────────────────────▼─────────────────────────────────┐
 │                    Node.js orchestrator                      │
 │                                                              │
-│  Google Translation ──► EN / JA / KO product terms           │
+│  Google Translation ──► EN / FR / JA / KO product terms      │
 │  TinyFish Search     ──► 8 official authority domains        │
 │  URL review          ──► accepted + excluded records         │
 │  TinyFish Fetch      ──► official recall evidence            │
