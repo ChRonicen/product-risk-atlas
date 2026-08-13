@@ -8,7 +8,7 @@ Product Risk Atlas turns a product name into a source-linked view of recurring s
 
 ## Demo
 
-https://github.com/user-attachments/assets/cee9b914-2e7c-4132-9809-84e9604dc8b0
+https://github.com/user-attachments/assets/9e84cb58-158b-467d-a4a6-b3d755088bef
 
 ## What It Does
 
