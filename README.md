@@ -1,196 +1,172 @@
 # PRODUCT RISK ATLAS
+**Live Demo:** _add URL after deploy_
 
 **Cross-market product recall intelligence powered by TinyFish Search and Fetch.**
 
-Product Risk Atlas takes one product name, searches official recall sources across eight major markets, fetches the strongest evidence, and turns fragmented notices into regional risk rankings with traceable source links.
+Enter a product name and choose how many results to review. Product Risk Atlas searches official recall authorities across eight major markets, filters individual recall records from irrelevant results, fetches the accepted evidence, and builds regional risk rankings with direct source links.
 
-## What It Does
+## Architecture
 
-- Scans the United States, European Union, United Kingdom, Canada, Australia, Mainland China, Japan and South Korea.
-- Reviews 5-30 TinyFish Search results per market.
-- Separates accepted recall evidence from excluded search results and explains every exclusion.
-- Fetches official detail pages and preserves search snippets when a source cannot be read reliably.
-- Scores recurring risk signals from 0-10 for each market.
-- Streams live progress into eight regional cards while the scan is running.
-- Gives every scan a session ID so progress survives refreshes, detail navigation and browser back.
-
-## TinyFish Integration
-
-| Stage | TinyFish operation | Purpose |
-| :--- | :--- | :--- |
-| Discovery | `client.search.query()` | Find ranked results from each market's official recall authority. |
-| Pagination | Search `page` parameter | Review up to 30 results without expanding or rewriting the product query. |
-| Validation | Deterministic URL rules | Separate individual recall records from indexes, guidance and unrelated pages. |
-| Evidence | `client.fetch.getContents()` | Read accepted official pages in parallel and extract clean text. |
-| Analysis | Multilingual risk dictionary | Tag recurring hazards and calculate regional 0-10 risk signals. |
-
-Search and Fetch are used for the shortest reliable research path. The application does not send an autonomous browser agent across all eight sites.
-
-## System Architecture
-
-```mermaid
-graph TD
-    User[User enters a product and amount] --> API[Create scan session]
-    API --> Jobs[In-memory scan job]
-    Jobs --> Search[TinyFish Search]
-    Search --> Review[Review and exclude results]
-    Review --> Fetch[TinyFish Fetch]
-    Fetch --> Tags[Multilingual risk tagging]
-    Tags --> Cards[Regional evidence cards]
-    Tags --> Matrix[Cross-market 0-10 matrix]
-    Cards --> Detail[Accepted and excluded evidence page]
+```text
+┌─────────────────────────────────────────────────────────────┐
+│                      Browser (Client)                       │
+│                                                             │
+│  Product input → Amount slider → Regional cards             │
+│  Live market status → Risk matrix → Evidence detail page    │
+└──────────────────────────┬──────────────────────────────────┘
+                           │ POST /api/scans
+                           │ GET  /api/scans/:id
+┌──────────────────────────▼──────────────────────────────────┐
+│                 Node.js Scan Orchestrator                   │
+│                                                             │
+│  Server-side session store                                  │
+│    │                                                        │
+│    ├─ TinyFish Search ──► 8 official authority domains      │
+│    │     page 1-3, based on selected amount                 │
+│    │                                                        │
+│    ├─ Result review ──► accepted + excluded records         │
+│    │                                                        │
+│    └─ TinyFish Fetch ──► accepted official detail pages     │
+│                                                             │
+│  Multilingual risk tags → regional scores → session events  │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-### Scan Lifecycle
+No database. Scan sessions and progress events are stored in memory for one hour.
 
-```mermaid
-stateDiagram-v2
-    [*] --> Queued
-    Queued --> Searching
-    Searching --> CandidatesFound
-    CandidatesFound --> Fetching
-    Fetching --> Complete
-    Fetching --> Partial
-    Searching --> NoCandidates
-    Complete --> [*]
-    Partial --> [*]
-    NoCandidates --> [*]
+### TinyFish SDK flow
+
+```text
+client.search.query({ query, page })
+  │
+  ├── 5-30 ranked results per market
+  ├── deterministic URL review
+  │     ├── accepted: individual recall record
+  │     └── excluded: index, guidance, unrelated page
+  │
+  └── client.fetch.getContents({ urls })
+        ├── fetched page evidence
+        └── search snippet fallback
 ```
 
-Each market publishes real progress events. A completed card replaces its skeleton immediately without waiting for the other markets.
+## Features
 
-## Evidence Review
+- Search **8 markets**: US, EU, UK, Canada, Australia, Mainland China, Japan and South Korea
+- Review **5-30 results per market** in increments of 5
+- Watch each market move through **Queued → Searching → Fetching → Complete**
+- See completed regional cards immediately without waiting for the slowest market
+- Compare recurring risk signals on a **0-10 scale**
+- Preview the top three accepted records on each market card
+- Open all reviewed results, split into **Accepted Evidence** and **Excluded Search Results**
+- Restore active scans after refresh, detail navigation, or browser back using a scan session ID
+- Use the server demo key or optionally **Bring Your Own TinyFish Key**
 
-TinyFish Search returns up to ten results per page. Product Risk Atlas reviews the selected amount for every market and keeps both sides of the decision:
+## Search and Review Flow
 
-- **Accepted evidence** contains individual official recall records used in risk scoring.
-- **Excluded search results** contains indexes, guidance, unrelated pages and failed fetches with an explicit exclusion reason.
+1. User enters a product and selects the number of results per market
+2. `POST /api/scans` creates an in-memory scan session
+3. TinyFish Search queries each official authority with a localized product term
+4. Search pagination supplies up to 30 ranked results without expanding the product query
+5. Deterministic URL rules separate individual recall records from excluded results
+6. TinyFish Fetch reads accepted official pages in parallel
+7. A multilingual dictionary tags fire, overheating, burns, explosion, short circuit, swelling, chemical and injury signals
+8. The UI polls the scan session and restores every completed market from saved events
 
-The regional card previews three accepted records. `View all N reviewed records` opens the complete accepted and excluded result set for that scan session.
-
-## Risk Scoring
-
-The score describes recall signal frequency, not real-world incident probability.
+## Risk Score
 
 ```text
 risk score = records mentioning the risk / accepted records x 10
 ```
 
-A score of `8.0` means that 80% of the accepted recall records for that market mention the risk. Higher scores indicate stronger recall risk signals in the collected evidence.
+A score of `8.0` means 80% of the accepted recall records for that market mention the risk. The score measures signal frequency in the collected recalls, not real-world incident probability.
 
-## Server-Side Sessions
-
-Starting a scan creates a server-side session ID:
-
-```text
-/?scan=<session-id>
-/market.html?market=US&scan=<session-id>
-```
-
-The server keeps task events and market results in memory for one hour. Leaving the page does not stop the TinyFish work. Returning to the scan URL replays the saved events and restores the current UI state.
-
-This demo uses no database. Restarting the server clears active and completed scan sessions.
-
-## API Key Security
-
-The app supports two key paths:
-
-1. **Demo key**: `TINYFISH_API_KEY` exists only in the server process environment.
-2. **Bring Your Own Key**: an optional user key is sent for one scan and is never added to session events, URLs, browser storage or API responses.
-
-Use HTTPS in production so user-provided keys are encrypted in transit. Never commit a real `.env` file. Rotate any key that has been exposed.
-
-## Getting Started
+## Setup
 
 ### Prerequisites
 
 - Node.js 20+
-- A TinyFish API key from [TinyFish](https://agent.tinyfish.ai/)
+- TinyFish API key
 
-### Install
+### Environment Variables
+
+Use `.env.example` as a reference and inject the demo key into the server process:
+
+```env
+TINYFISH_API_KEY=your-tinyfish-api-key
+PORT=4173
+```
+
+The server never returns the demo key to the browser.
+
+Bring Your Own Key is optional. A user key is used for one scan and is never stored in session events, URLs, browser storage, or API responses. Use HTTPS in production.
+
+### Install and Run
 
 ```bash
-git clone https://github.com/ChRonicen/product-risk-atlas.git
-cd product-risk-atlas
 npm install
+TINYFISH_API_KEY=your_key npm start
 ```
 
-### Configure
+Open http://localhost:4173
 
-Set the demo key in the server environment:
-
-```bash
-export TINYFISH_API_KEY=your_key
-export PORT=4173
-```
-
-`.env.example` documents the required variables. The application does not load `.env` automatically.
-
-### Run
-
-```bash
-npm start
-```
-
-Open [http://localhost:4173](http://localhost:4173).
-
-### Run the Scanner as a Script
+### CLI Scanner
 
 ```bash
 TINYFISH_API_KEY=your_key npm run scan -- "power bank"
 ```
 
-The command prints the complete structured result as JSON.
+The CLI prints the complete structured scan result as JSON.
 
-## VPS Deployment
+## Deployment
 
-Install production dependencies and inject secrets through the process manager or service unit:
+Any Node-compatible VPS works. Install production dependencies, inject `TINYFISH_API_KEY` through the process manager, and place Caddy or Nginx with HTTPS in front of the app.
 
 ```bash
 npm ci --omit=dev
 TINYFISH_API_KEY=your_key PORT=4173 npm start
 ```
 
-Place a reverse proxy such as Caddy or Nginx in front of the Node server and enable HTTPS before exposing Bring Your Own Key publicly.
-
 ## Project Structure
 
 ```text
 product-risk-atlas/
 ├── public/
-│   ├── index.html       # Scan interface
-│   ├── app.js           # Progress restoration and UI state
-│   ├── market.html      # Regional evidence page
+│   ├── index.html       # Search form, amount selector and results layout
+│   ├── app.js           # Scan session polling and progressive card updates
+│   ├── market.html      # Full regional evidence page
 │   ├── market.js        # Accepted and excluded result rendering
-│   └── styles.css       # Responsive light and dark themes
+│   └── styles.css       # Responsive light and dark UI
 ├── scripts/
-│   └── risk-scan.mjs    # TinyFish Search, Fetch and risk pipeline
+│   └── risk-scan.mjs    # TinyFish Search, Fetch and scoring pipeline
 ├── research/
 │   ├── experiment-protocol.md
 │   └── product-scopes.json
-├── server.mjs           # HTTP server and scan session store
+├── server.mjs           # HTTP API and in-memory scan sessions
 ├── .env.example
 └── package.json
 ```
 
-## Current Constraints
+## Constraint Checklist
 
-| Constraint | Current behavior |
-| :--- | :--- |
-| Persistent database | No. Scan sessions are in memory. |
-| Session lifetime | One hour. |
-| Source scope | Fixed official authority per market. |
-| Search amount | 5-30 results per market, in increments of 5. |
-| Risk interpretation | Frequency in accepted recall evidence, not incident probability. |
-| Fetch fallback | Search snippet retained when official page text is too short. |
+| Constraint | Status |
+|---|---|
+| External database used? | NO (pure in-memory) |
+| Fixed official sources? | YES (one authority per market) |
+| Search pagination? | YES (up to 3 pages per market) |
+| Accepted and excluded evidence visible? | YES |
+| Progressive market status? | YES (session event polling) |
+| Navigation-safe scans? | YES (server-side scan ID) |
+| Demo key exposed to browser? | NO |
+| Bring Your Own Key stored? | NO |
 
 ## Tech Stack
 
-- Node.js HTTP server
-- Vanilla JavaScript and CSS
-- [`@tiny-fish/sdk`](https://www.npmjs.com/package/@tiny-fish/sdk)
-- TinyFish Search and Fetch
+- **Server:** Node.js HTTP server
+- **Frontend:** Vanilla JavaScript and CSS
+- **Web Data:** TinyFish SDK (`client.search.query`, `client.fetch.getContents`)
+- **State:** In-memory scan sessions with one-hour cleanup
+- **Deployment:** Node-compatible VPS behind HTTPS
 
 ## Disclaimer
 
-Product Risk Atlas is a research prototype. It summarizes public recall evidence and does not replace legal, regulatory, engineering or product safety review. Always verify findings against the linked official sources.
+Product Risk Atlas is a research prototype. It summarizes public recall evidence and does not replace legal, regulatory, engineering, or product safety review. Always verify findings against the linked official sources.
