@@ -1,16 +1,57 @@
 import { TinyFish } from "@tiny-fish/sdk";
 
-function marketsFor(product) {
+function marketsFor(terms) {
   return [
-  { id: "US", name: "United States", authority: "U.S. CPSC", domain: "cpsc.gov", term: product, recallTerm: "recall", detail: /\/Recalls\//i },
-  { id: "EU", name: "European Union", authority: "EU Safety Gate", domain: "ec.europa.eu", term: product, recallTerm: "recall", detail: /alertDetail/i },
-  { id: "UK", name: "United Kingdom", authority: "UK OPSS", domain: "gov.uk", term: product, recallTerm: "recall", detail: /(product-safety-alerts-reports-recalls|\.pdf)/i },
-  { id: "CA", name: "Canada", authority: "Health Canada", domain: "recalls-rappels.canada.ca", term: product, recallTerm: "recall", detail: /\/alert-recall\//i },
-  { id: "AU", name: "Australia", authority: "Product Safety Australia", domain: "productsafety.gov.au", term: product, recallTerm: "recall", detail: /(\/recalls?\/|recall.*\.pdf|system\/files\/recall)/i },
-  { id: "CN", name: "Mainland China", authority: "SAMR", domain: "samr.gov.cn", term: product === "power bank" ? "移动电源" : product, recallTerm: "召回" },
-  { id: "JP", name: "Japan", authority: "Consumer Affairs Agency", domain: "recall.caa.go.jp", term: product === "power bank" ? "モバイルバッテリー" : product, recallTerm: "recall", detail: /detail\.php/i },
-  { id: "KR", name: "South Korea", authority: "Safety Korea", domain: "safetykorea.kr", term: product === "power bank" ? "보조배터리" : product, recallTerm: "리콜", detail: /recallUid=/i }
+  { id: "US", name: "United States", authority: "U.S. CPSC", domain: "cpsc.gov", term: terms.en, recallTerm: "recall", detail: /\/Recalls\//i },
+  { id: "EU", name: "European Union", authority: "EU Safety Gate", domain: "ec.europa.eu", term: terms.en, recallTerm: "recall", detail: /alertDetail/i },
+  { id: "UK", name: "United Kingdom", authority: "UK OPSS", domain: "gov.uk", term: terms.en, recallTerm: "recall", detail: /(product-safety-alerts-reports-recalls|\.pdf)/i },
+  { id: "CA", name: "Canada", authority: "Health Canada", domain: "recalls-rappels.canada.ca", term: terms.en, recallTerm: "recall", detail: /\/alert-recall\//i },
+  { id: "AU", name: "Australia", authority: "Product Safety Australia", domain: "productsafety.gov.au", term: terms.en, recallTerm: "recall", detail: /(\/recalls?\/|recall.*\.pdf|system\/files\/recall)/i },
+  { id: "CN", name: "Mainland China", authority: "SAMR", domain: "samr.gov.cn", term: terms.zh, recallTerm: "召回" },
+  { id: "JP", name: "Japan", authority: "Consumer Affairs Agency", domain: "recall.caa.go.jp", term: terms.ja, recallTerm: "recall", detail: /detail\.php/i },
+  { id: "KR", name: "South Korea", authority: "Safety Korea", domain: "safetykorea.kr", term: terms.ko, recallTerm: "리콜", detail: /recallUid=/i }
   ];
+}
+
+const translationTargets = {
+  en: "en",
+  zh: "zh-CN",
+  ja: "ja",
+  ko: "ko"
+};
+
+function decodeEntities(text = "") {
+  return text
+    .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCodePoint(Number.parseInt(code, 16)))
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
+}
+
+async function translateProduct(product, apiKey) {
+  if (!apiKey) {
+    throw new Error("GOOGLE_TRANSLATE_API_KEY is required for localized market searches");
+  }
+
+  const entries = await Promise.all(Object.entries(translationTargets).map(async ([name, target]) => {
+    const response = await fetch(`https://translation.googleapis.com/language/translate/v2?key=${encodeURIComponent(apiKey)}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ q: product, target, format: "text" })
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload?.error?.message || `Google Translation failed for ${target}`);
+    }
+    const translated = payload?.data?.translations?.[0]?.translatedText;
+    if (!translated) throw new Error(`Google Translation returned no ${target} term`);
+    return [name, decodeEntities(translated).trim()];
+  }));
+
+  return Object.fromEntries(entries);
 }
 
 const riskTerms = [
@@ -154,6 +195,7 @@ async function scanMarket(client, market, product, reviewLimit, onProgress) {
 export async function scanProduct({
   product = "power bank",
   apiKey = process.env.TINYFISH_API_KEY,
+  translationApiKey = process.env.GOOGLE_TRANSLATE_API_KEY,
   reviewLimit = 10,
   onProgress
 } = {}) {
@@ -164,7 +206,8 @@ export async function scanProduct({
   }
 
   const client = new TinyFish({ apiKey });
-  const markets = marketsFor(product);
+  const localizedTerms = await translateProduct(product, translationApiKey);
+  const markets = marketsFor(localizedTerms);
   const results = [];
   onProgress?.({
     type: "scan_started",

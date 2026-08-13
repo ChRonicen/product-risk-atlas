@@ -28,6 +28,7 @@ https://github.com/user-attachments/assets/cee9b914-2e7c-4132-9809-84e9604dc8b0
 │    │                                                        │
 │    ├─ TinyFish Search ──► 8 official authority domains      │
 │    │     page 1-3, based on selected amount                 │
+│    │     Google-translated EN / ZH / JA / KO product terms  │
 │    │                                                        │
 │    ├─ Result review ──► accepted + excluded records         │
 │    │                                                        │
@@ -91,6 +92,7 @@ A score of `8.0` means 80% of the accepted recall records for that market mentio
 
 - Node.js 20+
 - TinyFish API key
+- Google Cloud Translation API key
 
 ### Environment Variables
 
@@ -98,6 +100,7 @@ Use `.env.example` as a reference and inject the demo key into the server proces
 
 ```env
 TINYFISH_API_KEY=your-tinyfish-api-key
+GOOGLE_TRANSLATE_API_KEY=your-google-translation-api-key
 PORT=4173
 ```
 
@@ -109,7 +112,7 @@ Bring Your Own Key is optional. A user key is used for one scan and is never sto
 
 ```bash
 npm install
-TINYFISH_API_KEY=your_key npm start
+TINYFISH_API_KEY=your_key GOOGLE_TRANSLATE_API_KEY=your_google_key npm start
 ```
 
 Open http://localhost:4173
@@ -117,18 +120,18 @@ Open http://localhost:4173
 ### CLI Scanner
 
 ```bash
-TINYFISH_API_KEY=your_key npm run scan -- "power bank"
+TINYFISH_API_KEY=your_key GOOGLE_TRANSLATE_API_KEY=your_google_key npm run scan -- "power bank"
 ```
 
 The CLI prints the complete structured scan result as JSON.
 
 ## Deployment
 
-Any Node-compatible VPS works. Install production dependencies, inject `TINYFISH_API_KEY` through the process manager, and place Caddy or Nginx with HTTPS in front of the app.
+Any Node-compatible VPS works. Install production dependencies, inject `TINYFISH_API_KEY` and `GOOGLE_TRANSLATE_API_KEY` through the process manager, and place Caddy or Nginx with HTTPS in front of the app.
 
 ```bash
 npm ci --omit=dev
-TINYFISH_API_KEY=your_key PORT=4173 npm start
+TINYFISH_API_KEY=your_key GOOGLE_TRANSLATE_API_KEY=your_google_key PORT=4173 npm start
 ```
 
 ## Project Structure
@@ -169,6 +172,7 @@ product-risk-atlas/
 - **Server:** Node.js HTTP server
 - **Frontend:** Vanilla JavaScript and CSS
 - **Web Data:** TinyFish SDK (`client.search.query`, `client.fetch.getContents`)
+- **Query Localization:** Google Cloud Translation API
 - **State:** In-memory scan sessions with one-hour cleanup
 - **Deployment:** Node-compatible VPS behind HTTPS
 

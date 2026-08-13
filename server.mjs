@@ -53,7 +53,13 @@ function startScanJob({ product, reviewLimit, apiKey }) {
   jobs.set(id, job);
   const emit = (event) => job.events.push({ sequence: job.events.length, ...event });
 
-  scanProduct({ product, reviewLimit, apiKey, onProgress: emit })
+  scanProduct({
+    product,
+    reviewLimit,
+    apiKey,
+    translationApiKey: process.env.GOOGLE_TRANSLATE_API_KEY,
+    onProgress: emit
+  })
     .then(() => { job.status = "complete"; })
     .catch((error) => {
       job.status = "failed";
