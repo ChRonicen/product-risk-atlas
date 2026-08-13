@@ -1,0 +1,13 @@
+{
+  "name": "product-risk-atlas",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "scan": "node scripts/risk-scan.mjs",
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "@tiny-fish/sdk": "latest"
+  }
+}

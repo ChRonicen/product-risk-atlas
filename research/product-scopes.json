@@ -1,0 +1,52 @@
+{
+  "power_bank": {
+    "label": "Consumer power bank",
+    "include": [
+      "portable rechargeable battery used to charge consumer electronics",
+      "wired power bank",
+      "wireless or magnetic power bank",
+      "power bank with integrated charging cable"
+    ],
+    "exclude": [
+      "portable power station",
+      "UPS",
+      "vehicle jump starter",
+      "EV battery",
+      "internal or replacement device battery",
+      "wall charger without an integrated battery"
+    ]
+  },
+  "child_kick_scooter": {
+    "label": "Children's non-powered kick scooter",
+    "include": [
+      "child-operated kick scooter propelled by pushing with one foot",
+      "two-wheel or three-wheel children's kick scooter",
+      "folding children's kick scooter"
+    ],
+    "exclude": [
+      "electric scooter",
+      "mobility scooter",
+      "hoverboard or self-balancing scooter",
+      "skateboard",
+      "ride-on car",
+      "adult commuter scooter unless the recall explicitly includes children"
+    ]
+  },
+  "residential_air_conditioner": {
+    "label": "Residential air conditioner",
+    "include": [
+      "room air conditioner",
+      "window air conditioner",
+      "portable air conditioner",
+      "residential split-system air conditioner"
+    ],
+    "exclude": [
+      "vehicle air conditioner",
+      "industrial process chiller",
+      "commercial rooftop HVAC system",
+      "refrigerator or freezer",
+      "fan or air purifier without cooling",
+      "heat pump unless marketed as a residential air conditioner"
+    ]
+  }
+}

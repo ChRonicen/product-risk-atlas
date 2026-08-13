@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Scan official product recall sources across eight major markets with TinyFish." />
+    <title>Product Risk Atlas</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <header class="shell masthead">
+      <a class="brand" href="/" aria-label="Product Risk Atlas home">PRODUCT RISK ATLAS</a>
+      <span class="powered">Research powered by TinyFish</span>
+    </header>
+
+    <main class="shell">
+      <section class="intro" aria-labelledby="page-title">
+        <div class="intro-copy">
+          <p class="eyebrow">GLOBAL RECALL INTELLIGENCE</p>
+          <h1 id="page-title">One product.<br />Eight markets.</h1>
+          <p class="lede">Search official recall sources and compare the risks each market reports.</p>
+        </div>
+
+        <div class="scan-stack">
+          <form id="scan-form" class="scan-panel">
+            <div class="field">
+              <label for="product">Product</label>
+              <input id="product" name="product" value="power bank" autocomplete="off" required />
+            </div>
+            <div class="field amount-field">
+              <div class="amount-heading">
+                <label for="amount">Amount per market</label>
+                <output id="amount-output" for="amount">10</output>
+              </div>
+              <div class="amount-control">
+                <input id="amount" name="reviewLimit" type="range" min="5" max="30" step="5" value="10" aria-describedby="amount-helper" />
+                <div class="amount-marks" aria-hidden="true">
+                  <span class="amount-mark" data-value="5">5</span>
+                  <span class="amount-mark active" data-value="10">10</span>
+                  <span class="amount-mark" data-value="15">15</span>
+                  <span class="amount-mark" data-value="20">20</span>
+                  <span class="amount-mark" data-value="25">25</span>
+                  <span class="amount-mark" data-value="30">30</span>
+                </div>
+              </div>
+              <span id="amount-helper" class="helper">For more than 10, use a paid API key.</span>
+            </div>
+            <button id="scan-button" type="submit">Run scan</button>
+          </form>
+
+          <div class="api-setting">
+            <label for="api-key">Bring your own TinyFish key</label>
+            <input id="api-key" name="apiKey" form="scan-form" type="password" autocomplete="off" placeholder="Leave blank to use the free demo key" />
+            <span class="helper">Optional. Used for this scan only, never stored.</span>
+          </div>
+        </div>
+      </section>
+
+      <section id="status" class="status-panel" aria-live="polite">
+        <p>Ready to scan official sources in the US, EU, UK, Canada, Australia, China, Japan and South Korea.</p>
+      </section>
+
+      <section id="results" class="results" hidden>
+        <div id="summary" class="summary"></div>
+        <div class="section-heading regions-heading">
+          <h2>Regional evidence</h2>
+          <p>Each market keeps its own result count and evidence quality.</p>
+        </div>
+        <div id="market-grid" class="market-grid"></div>
+        <div class="matrix-block">
+          <div class="section-heading">
+            <h2>Cross-market signal</h2>
+            <p>Scores range from 0 to 10. A higher score means a stronger recall risk signal.</p>
+          </div>
+          <div id="risk-matrix" class="matrix-wrap"></div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="shell footer">
+      <span>Official sources remain the source of truth.</span>
+      <a href="https://www.tinyfish.ai/" target="_blank" rel="noreferrer">TinyFish</a>
+    </footer>
+  </body>
+</html>
